@@ -20,7 +20,7 @@ import 'package:path/path.dart' as p;
 
 import 'src/api_client.dart';
 
-const List<String> _SCOPES = [DriveApi.DriveScope, DriveApi.DriveScriptsScope];
+const List<String> _SCOPES = [DriveApi.driveScope, DriveApi.driveScriptsScope];
 
 const String _SCRIPT_MIME_TYPE = "application/vnd.google-apps.script";
 const String _CONTENT_TYPE = "application/vnd.google-apps.script+json";
@@ -29,16 +29,18 @@ const String apiId =
     "182739467893-iq44a0gc3h2easrua3mru8n84pdvpi4h.apps.googleusercontent.com";
 const String apiSecret = "SNmwenVx4fd5aE7aeEixPoxI";
 
-String get _savedCredentialsPath {
+String? get _savedCredentialsPath {
   String fileName = "auth.json";
   if (io.Platform.environment.containsKey('APPS_SCRIPT_TOOLS_CACHE')) {
     return io.Platform.environment['APPS_SCRIPT_TOOLS_CACHE'];
   } else if (io.Platform.operatingSystem == 'windows') {
     var appData = io.Platform.environment['APPDATA'];
+    if (appData == null) throw ArgumentError('APPDATA not set');
     return p.join(appData, 'AppsScriptTools', 'Cache', fileName);
   } else {
-    return p.join(
-        io.Platform.environment['HOME'], '.apps_script_tools-cache', fileName);
+    var home = io.Platform.environment['HOME'];
+    if (home == null) throw ArgumentError('HOME not set');
+    return p.join(home, '.apps_script_tools-cache', fileName);
   }
 }
 
@@ -48,10 +50,10 @@ String get _savedCredentialsPath {
 class Uploader {
   final ApiClient _apiClient = ApiClient();
   final String _destination;
-  DriveApi _drive;
+  DriveApi? _drive;
 
-  String _projectName;
-  String _destinationFolderId;
+  String? _projectName;
+  String? _destinationFolderId;
 
   /// Instantiates an uploader with the provided Google Drive destination.
   Uploader(this._destination);
@@ -62,7 +64,7 @@ class Uploader {
   Future authenticate() async {
     await _apiClient.authenticate(
         apiId, apiSecret, _SCOPES, _savedCredentialsPath);
-    _drive = DriveApi(_apiClient.client);
+    _drive = DriveApi(_apiClient.client());
   }
 
   /// Shuts down this uploader.
@@ -70,8 +72,15 @@ class Uploader {
     await _apiClient.close();
   }
 
+  DriveApi _api() {
+    if (_drive == null) {
+      throw StateError("Uploader is not authenticated");
+    }
+    return _drive!;
+  }
+
   String _createPayload(
-      String source, String projectName, Map<String, dynamic> existing) {
+      String source, String projectName, Map<String, dynamic>? existing) {
     // See https://developers.google.com/apps-script/guides/import-export.
     var payload = {
       "name": projectName,
@@ -91,13 +100,13 @@ class Uploader {
     for (var segment in segments) {
       var q =
           "name = '$segment' and '$parentId' in parents and trashed = false";
-      var nestedFiles = (await drive.files.list(q: q)).files;
+      var nestedFiles = (await drive.files.list(q: q)).files!;
       var folders = nestedFiles
           .where(
               (file) => file.mimeType == "application/vnd.google-apps.folder")
           .toList();
       if (folders.length == 1) {
-        parentId = folders.first.id;
+        parentId = folders.first.id!;
       } else if (folders.isEmpty) {
         throw "Couldn't find folder $segment";
       } else {
@@ -116,13 +125,13 @@ class Uploader {
       var segments = _destination.split("/");
       var folderSegments = segments.take(segments.length - 1);
       _projectName = segments.last;
-      _destinationFolderId = await _findFolder(_drive, folderSegments);
+      _destinationFolderId = await _findFolder(_api(), folderSegments);
     }
 
     var query = "name = '$_projectName' and "
         "'$_destinationFolderId' in parents and "
         "trashed = false";
-    var sameNamedFiles = (await _drive.files.list(q: query)).files;
+    var sameNamedFiles = (await _api().files.list(q: query)).files!;
     var scripts = sameNamedFiles
         .where((file) => file.mimeType == "application/vnd.google-apps.script")
         .toList();
@@ -132,9 +141,9 @@ class Uploader {
     } else if (scripts.length == 1) {
       print("Need to update existing project.");
       try {
-        Media media = await _drive.files.export(scripts[0].id, _CONTENT_TYPE,
-            downloadOptions: DownloadOptions.FullMedia);
-        existing = await media.stream
+        Media? media = await _api().files.export(scripts[0].id!, _CONTENT_TYPE,
+            downloadOptions: DownloadOptions.fullMedia);
+        existing = await media!.stream
             .transform(utf8.decoder)
             .transform(json.decoder)
             .first;
@@ -151,7 +160,7 @@ class Uploader {
       ..name = _projectName
       ..mimeType = _SCRIPT_MIME_TYPE;
 
-    var payload = _createPayload(source, _projectName, existing);
+    var payload = _createPayload(source, _projectName!, existing);
     var utf8Encoded = utf8.encode(payload);
     var media = Media(
         Stream<List<int>>.fromIterable([utf8Encoded]), utf8Encoded.length,
@@ -159,12 +168,12 @@ class Uploader {
 
     if (scripts.isEmpty) {
       print("Creating new file ${_projectName}");
-      file.parents = [_destinationFolderId];
-      await _drive.files.create(file, uploadMedia: media);
+      file.parents = [_destinationFolderId!];
+      await _api().files.create(file, uploadMedia: media);
     } else if (scripts.length == 1) {
       // Update the existing file.
       print("Updating existing file ${_projectName}");
-      await _drive.files.update(file, scripts[0].id, uploadMedia: media);
+      await _api().files.update(file, scripts[0].id!, uploadMedia: media);
     }
     print("Uploading ${_projectName} done");
   }

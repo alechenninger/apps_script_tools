@@ -59,9 +59,9 @@ Stream watchPath(String path, {bool emitAtListen = false}) async* {
 /// [onlyCurrentDocument] and [notOnlyCurrentDocument] to, optionally, add
 /// some boilerplate. See [gsify] for more information.
 Future startWatching(String sourcePath, String destination,
-    {List<String> interfaceFunctions,
-    bool onlyCurrentDocument,
-    bool notOnlyCurrentDocument}) async {
+    {List<String> interfaceFunctions = const [],
+    bool onlyCurrentDocument = false,
+    bool notOnlyCurrentDocument = false}) async {
   var uploader = Uploader(destination);
   await uploader.authenticate();
 

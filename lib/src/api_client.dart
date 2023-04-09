@@ -23,15 +23,22 @@ import 'package:http/http.dart' show Client;
 ///
 /// Asks the user to authenticate and caches the tokens.
 class ApiClient {
-  Client _baseClient;
-  AuthClient client;
+  Client? _baseClient;
+  AuthClient? _client;
+
+  AuthClient client() {
+    if (_client == null) {
+      throw StateError('must authenticate first');
+    }
+    return _client!;
+  }
 
   /// Authenticates this uploader.
   ///
   /// Uses Google APIs to authenticate with [id] and [secret]. If id
   Future authenticate(String id, String secret, List<String> scopes,
-      String authCachePath) async {
-    _baseClient = Client();
+      String? authCachePath) async {
+    var baseClient = _baseClient = Client();
     var clientId = ClientId(id, secret);
     // TODO(floitsch): this probably doesn't work when the scopes change.
     var credentials = _readSavedCredentials(authCachePath);
@@ -39,23 +46,23 @@ class ApiClient {
         credentials.refreshToken == null &&
             credentials.accessToken.hasExpired) {
       credentials = await obtainAccessCredentialsViaUserConsent(
-          clientId, scopes, _baseClient, (String str) {
+          clientId, scopes, baseClient, (String str) {
         print("Please authorize at this URL: $str");
       });
       _saveCredentials(authCachePath, credentials);
     }
-    client = credentials.refreshToken == null
-        ? authenticatedClient(_baseClient, credentials)
-        : autoRefreshingClient(clientId, credentials, _baseClient);
+    _client = credentials.refreshToken == null
+        ? authenticatedClient(baseClient, credentials)
+        : autoRefreshingClient(clientId, credentials, baseClient);
   }
 
   /// Shuts down this uploader.
   Future close() async {
-    await client.close();
-    await _baseClient.close();
+    _client?.close();
+    _baseClient?.close();
   }
 
-  AccessCredentials _readSavedCredentials(String savedCredentialsPath) {
+  AccessCredentials? _readSavedCredentials(String? savedCredentialsPath) {
     if (savedCredentialsPath == null) return null;
 
     var file = io.File(savedCredentialsPath);
@@ -76,7 +83,7 @@ class ApiClient {
   }
 
   void _saveCredentials(
-      String savedCredentialsPath, AccessCredentials credentials) {
+      String? savedCredentialsPath, AccessCredentials credentials) {
     if (savedCredentialsPath == null) return;
 
     try {

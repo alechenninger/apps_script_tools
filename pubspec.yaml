@@ -19,15 +19,15 @@ author: Florian Loitsch <florian@loitsch.com>
 homepage: https://github.com/google/apps_script_tools
 
 environment:
-  sdk: ">=2.0.0 <3.0.0"
+  sdk: ">=2.12.0 <3.0.0"
 
 dependencies:
-  args: ^1.5.0
-  googleapis: ^0.54.0
-  googleapis_auth: ^0.2.3
+  args: ^2.3.0
+  googleapis: ^7.0.0
+  googleapis_auth: ^1.1.0
   path: ^1.5.1
-  watcher: ^0.9.7
-  http: ^0.12.0
+  watcher: ^1.0.2
+  http: ^0.13.4
 
 executables:
   apps_script_watch: main
