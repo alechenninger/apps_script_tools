@@ -18,11 +18,11 @@ version: 1.0.4
 homepage: https://github.com/alechenninger/apps_script_tools
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  sdk: ">=3.2.0 <4.0.0"
 
 dependencies:
   args: ^2.3.0
-  googleapis: ^11.0.0
+  googleapis: ^12.0.0
   googleapis_auth: ^1.1.0
   path: ^1.5.1
   watcher: ^1.0.2
